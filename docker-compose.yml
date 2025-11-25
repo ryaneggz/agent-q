@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  agent-queue:
+    build: .
+    container_name: agent-queue-system
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4}
+      - MAX_QUEUE_SIZE=${MAX_QUEUE_SIZE:-1000}
+      - PROCESSING_TIMEOUT=${PROCESSING_TIMEOUT:-60}
+      - KEEPALIVE_INTERVAL=${KEEPALIVE_INTERVAL:-30}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./app:/app/app:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
