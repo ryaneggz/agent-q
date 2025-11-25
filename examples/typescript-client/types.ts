@@ -20,6 +20,7 @@ export enum Priority {
 export interface MessageSubmitRequest {
   message: string;
   priority: Priority;
+  thread_id?: string | null;
 }
 
 export interface MessageSubmitResponse {
@@ -27,6 +28,7 @@ export interface MessageSubmitResponse {
   state: MessageState;
   queue_position: number | null;
   created_at: string;
+  thread_id: string | null;
 }
 
 export interface MessageStatusResponse {
@@ -40,6 +42,7 @@ export interface MessageStatusResponse {
   result: string | null;
   error: string | null;
   queue_position: number | null;
+  thread_id: string | null;
 }
 
 export interface QueueSummaryResponse {
@@ -60,6 +63,28 @@ export interface QueueSummaryResponse {
     started_at: string;
     user_message: string;
   } | null;
+}
+
+export interface ThreadMetadata {
+  thread_id: string;
+  message_count: number;
+  created_at: string;
+  last_activity: string;
+  states: Record<string, number>;
+}
+
+export interface ThreadSummary {
+  thread_id: string;
+  message_count: number;
+  created_at: string;
+  last_activity: string;
+  last_message_preview: string | null;
+}
+
+export interface ThreadMessagesResponse {
+  thread_id: string;
+  total_messages: number;
+  messages: MessageStatusResponse[];
 }
 
 export interface SSEEvent {

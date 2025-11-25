@@ -8,6 +8,7 @@ AI Agent Queue System with FastAPI and LangGraph - A production-ready message qu
 - **Sequential Processing**: One message at a time to ensure consistent agent behavior
 - **Server-Sent Events (SSE)**: Real-time streaming of agent responses
 - **Queue Management**: Full CRUD operations for messages with state tracking
+- **Conversation Threads**: Optional `thread_id` parameter groups related messages with metadata and history endpoints
 - **Graceful Lifecycle**: Proper startup/shutdown with worker management
 - **Async-First**: Built with asyncio for high concurrency
 - **Type-Safe**: Fully typed with Pydantic models
@@ -102,7 +103,8 @@ curl -X POST http://localhost:8000/messages \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What is the capital of France?",
-    "priority": "normal"
+    "priority": "normal",
+    "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0"
   }'
 ```
 
@@ -112,11 +114,17 @@ Response:
   "message_id": "550e8400-e29b-41d4-a716-446655440000",
   "state": "queued",
   "queue_position": 0,
-  "created_at": "2024-01-15T10:30:00.000Z"
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0"
 }
 ```
 
 Priority options: `high`, `normal` (default), `low`
+
+Threading notes:
+- `thread_id` is optional; omit it for standalone messages or reuse an existing value to continue a conversation.
+- IDs can be any string up to 255 characters (UUID recommended to avoid collisions).
+- The API echoes `thread_id` in submit/status responses to make correlation easy.
 
 #### 2. Get Message Status
 
@@ -138,7 +146,8 @@ Response:
   "completed_at": "2024-01-15T10:30:15.000Z",
   "result": "The capital of France is Paris.",
   "error": null,
-  "queue_position": null
+  "queue_position": null,
+  "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0"
 }
 ```
 
@@ -222,6 +231,102 @@ Response:
 curl http://localhost:8000/health
 ```
 
+#### 7. List Threads
+
+Retrieve every active thread with summary metadata sorted by last activity:
+
+```bash
+curl http://localhost:8000/threads
+```
+
+Response:
+```json
+[
+  {
+    "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0",
+    "message_count": 2,
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "last_activity": "2024-01-15T10:31:10.000Z",
+    "last_message_preview": "Follow-up: What's its population?"
+  }
+]
+```
+
+#### 8. Get Thread Metadata
+
+```bash
+curl http://localhost:8000/threads/{thread_id}
+```
+
+Response:
+```json
+{
+  "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0",
+  "message_count": 2,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "last_activity": "2024-01-15T10:31:10.000Z",
+  "states": {
+    "queued": 0,
+    "processing": 0,
+    "completed": 2,
+    "failed": 0,
+    "cancelled": 0
+  }
+}
+```
+
+#### 9. Get Thread Messages
+
+```bash
+curl http://localhost:8000/threads/{thread_id}/messages
+```
+
+Response:
+```json
+{
+  "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0",
+  "total_messages": 2,
+  "messages": [
+    {
+      "message_id": "550e8400-e29b-41d4-a716-446655440000",
+      "state": "completed",
+      "user_message": "Threaded question: What is the capital of France?",
+      "priority": "normal",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "started_at": "2024-01-15T10:30:05.000Z",
+      "completed_at": "2024-01-15T10:30:15.000Z",
+      "result": "The capital of France is Paris.",
+      "error": null,
+      "queue_position": null,
+      "thread_id": "a2e40f10-9f5a-4a54-9fb4-3b9f861fc2c0"
+    }
+  ]
+}
+```
+
+### Threaded Conversation Example
+
+```bash
+# 1) Submit first message with a client-generated thread_id
+THREAD_ID=$(uuidgen)
+curl -X POST http://localhost:8000/messages \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Threaded question: What is the capital of France?\", \"priority\": \"normal\", \"thread_id\": \"$THREAD_ID\"}"
+
+# 2) Submit follow-up in the same thread
+curl -X POST http://localhost:8000/messages \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Follow-up: What's its population?\", \"priority\": \"normal\", \"thread_id\": \"$THREAD_ID\"}"
+
+# 3) Inspect all messages for the thread
+curl http://localhost:8000/threads/$THREAD_ID/messages | jq
+```
+
+Best practices:
+- Reuse the same `thread_id` for every turn of the conversation.
+- Store the ID client-side (recommend UUIDs) so you can resume the thread later.
+- Thread metadata is updated automatically as each message changes state.
+
 ## Configuration
 
 ### Environment Variables
@@ -285,13 +390,16 @@ agent-queue-system/
 │   └── api/
 │       ├── __init__.py
 │       ├── routes.py        # REST API endpoints
+│       ├── threads.py       # Thread query endpoints
 │       └── streaming.py     # SSE streaming endpoint
 ├── tests/
 │   ├── unit/
 │   │   ├── test_models.py
-│   │   └── test_queue_manager.py
+│   │   ├── test_queue_manager.py
+│   │   └── test_thread_tracking.py
 │   └── integration/
-│       └── test_api.py
+│       ├── test_api.py
+│       └── test_thread_api.py
 ├── config/                  # Configuration files
 ├── .env.example             # Example environment variables
 ├── pyproject.toml           # Poetry dependencies
@@ -308,6 +416,7 @@ agent-queue-system/
 - **No Authentication**: Endpoints are not authenticated
 - **No Rate Limiting**: No rate limiting per user/IP
 - **No Retry Logic**: Failed messages are not automatically retried
+- **Thread Pagination**: Thread listing/message endpoints return full in-memory results (no pagination or TTL yet)
 
 ### Future Enhancements
 
@@ -382,10 +491,12 @@ npm run demo
 
 The demo showcases:
 - Submitting messages with different priorities
+- Creating threaded conversations using the optional `thread_id` field
 - Checking message status
 - Streaming responses via Server-Sent Events (SSE)
 - Cancelling queued messages
 - Viewing queue summary
+- Listing threads and retrieving thread metadata/messages
 
 See the [TypeScript Client README](examples/typescript-client/README.md) for detailed documentation.
 

@@ -47,6 +47,7 @@ async def submit_message(request: MessageSubmitRequest):
         message = await queue_manager.enqueue(
             user_message=request.message,
             priority=request.priority,
+            thread_id=request.thread_id,
         )
 
         # Get queue position
@@ -62,6 +63,7 @@ async def submit_message(request: MessageSubmitRequest):
             state=message.state,
             queue_position=queue_position,
             created_at=message.created_at,
+            thread_id=message.thread_id,
         )
 
     except Exception as e:
@@ -113,6 +115,7 @@ async def get_message_status(message_id: str):
         result=message.result,
         error=message.error,
         queue_position=queue_position,
+        thread_id=message.thread_id,
     )
 
 

@@ -7,7 +7,7 @@ from app.config import settings
 from app.queue_manager import QueueManager
 from app.agent_processor import AgentProcessor
 from app.worker import Worker
-from app.api import routes, streaming
+from app.api import routes, streaming, threads
 
 
 # Configure logging
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
         # Inject queue_manager into routers
         routes.set_queue_manager(queue_manager)
         streaming.set_queue_manager(queue_manager)
+        threads.set_queue_manager(queue_manager)
 
         # Start worker
         await worker.start()
@@ -86,6 +87,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(routes.router, tags=["messages"])
+app.include_router(threads.router, tags=["threads"])
 app.include_router(streaming.router, tags=["streaming"])
 
 

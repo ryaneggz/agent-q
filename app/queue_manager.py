@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, Set, List
 import logging
 
 from app.models import (
@@ -9,6 +9,8 @@ from app.models import (
     Priority,
     PRIORITY_MAP,
     QueueSummaryResponse,
+    ThreadMetadata,
+    ThreadSummary,
 )
 
 
@@ -34,7 +36,16 @@ class QueueManager:
         # Counter for insertion order (FIFO within same priority)
         self._counter = 0
 
-    async def enqueue(self, user_message: str, priority: Priority = Priority.NORMAL) -> QueuedMessage:
+        # Thread tracking indexes
+        self._thread_index: Dict[str, Set[str]] = {}
+        self._thread_metadata: Dict[str, ThreadMetadata] = {}
+
+    async def enqueue(
+        self,
+        user_message: str,
+        priority: Priority = Priority.NORMAL,
+        thread_id: Optional[str] = None,
+    ) -> QueuedMessage:
         """
         Add a message to the queue
 
@@ -51,10 +62,15 @@ class QueueManager:
                 user_message=user_message,
                 priority=priority,
                 state=MessageState.QUEUED,
+                thread_id=thread_id,
             )
 
             # Store message metadata
             self._messages[message.id] = message
+
+            # Track thread association
+            if thread_id:
+                self._track_thread_message(thread_id, message)
 
             # Add to priority queue
             # Priority queue uses (priority, counter) tuple for ordering
@@ -92,6 +108,9 @@ class QueueManager:
                     # Update state to processing
                     message.state = MessageState.PROCESSING
                     message.started_at = datetime.utcnow()
+                    self._update_thread_state_counts(
+                        message, MessageState.QUEUED, MessageState.PROCESSING
+                    )
 
                     logger.info(f"Message dequeued: id={message.id}")
                     return message
@@ -149,6 +168,9 @@ class QueueManager:
             if new_state == MessageState.FAILED and error:
                 message.error = error
 
+            # Update thread metadata if needed
+            self._update_thread_state_counts(message, old_state, new_state)
+
             logger.info(
                 f"Message state updated: id={message_id}, "
                 f"from={old_state}, to={new_state}"
@@ -201,8 +223,12 @@ class QueueManager:
                 return False, f"Cannot cancel message in state: {message.state}"
 
             # Update state to cancelled
+            old_state = message.state
             message.state = MessageState.CANCELLED
             message.completed_at = datetime.utcnow()
+            self._update_thread_state_counts(
+                message, old_state, MessageState.CANCELLED
+            )
 
             logger.info(f"Message cancelled: id={message_id}")
 
@@ -346,3 +372,98 @@ class QueueManager:
     def has_messages(self) -> bool:
         """Check if there are messages in the queue"""
         return not self._queue.empty()
+
+    def _track_thread_message(self, thread_id: str, message: QueuedMessage) -> None:
+        """Initialize and update thread metadata for a message"""
+        if thread_id not in self._thread_index:
+            self._thread_index[thread_id] = set()
+            self._thread_metadata[thread_id] = ThreadMetadata(
+                thread_id=thread_id,
+                message_count=0,
+                created_at=message.created_at,
+                last_activity=message.created_at,
+                states={state: 0 for state in MessageState},
+            )
+
+        self._thread_index[thread_id].add(message.id)
+
+        metadata = self._thread_metadata[thread_id]
+        metadata.message_count += 1
+        metadata.last_activity = message.created_at
+        metadata.states[message.state] = metadata.states.get(message.state, 0) + 1
+
+    def _update_thread_state_counts(
+        self, message: QueuedMessage, old_state: MessageState, new_state: MessageState
+    ) -> None:
+        """Update thread metadata when a message state changes"""
+        if not message.thread_id:
+            return
+
+        metadata = self._thread_metadata.get(message.thread_id)
+        if not metadata:
+            return
+
+        metadata.states[old_state] = max(
+            0, metadata.states.get(old_state, 0) - 1
+        )
+        metadata.states[new_state] = metadata.states.get(new_state, 0) + 1
+        metadata.last_activity = datetime.utcnow()
+
+    async def get_thread_messages(self, thread_id: str) -> List[QueuedMessage]:
+        """Return all messages for a given thread sorted chronologically"""
+        async with self._lock:
+            message_ids = self._thread_index.get(thread_id)
+            if not message_ids:
+                return []
+
+            messages = [
+                self._messages[msg_id]
+                for msg_id in message_ids
+                if msg_id in self._messages
+            ]
+
+            messages.sort(key=lambda msg: msg.created_at)
+            return messages
+
+    async def get_thread_metadata(self, thread_id: str) -> Optional[ThreadMetadata]:
+        """Return metadata for a specific thread"""
+        async with self._lock:
+            metadata = self._thread_metadata.get(thread_id)
+            if not metadata:
+                return None
+
+            return metadata.model_copy(deep=True)
+
+    async def list_threads(self) -> List[ThreadSummary]:
+        """Return summary information for all threads sorted by last activity"""
+        async with self._lock:
+            summaries: List[ThreadSummary] = []
+
+            for thread_id, metadata in self._thread_metadata.items():
+                message_ids = self._thread_index.get(thread_id, set())
+                messages = [
+                    self._messages[msg_id]
+                    for msg_id in message_ids
+                    if msg_id in self._messages
+                ]
+
+                last_message_preview = None
+                if messages:
+                    last_message = max(messages, key=lambda msg: msg.created_at)
+                    preview_text = last_message.user_message
+                    if len(preview_text) > 100:
+                        preview_text = preview_text[:97] + "..."
+                    last_message_preview = preview_text
+
+                summaries.append(
+                    ThreadSummary(
+                        thread_id=thread_id,
+                        message_count=metadata.message_count,
+                        created_at=metadata.created_at,
+                        last_activity=metadata.last_activity,
+                        last_message_preview=last_message_preview,
+                    )
+                )
+
+            summaries.sort(key=lambda summary: summary.last_activity, reverse=True)
+            return summaries
