@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     # LangGraph Model Configuration
     openai_api_key: str = ""
-    model_name: str = "gpt-4"
+    model_name: str = "gpt-5.1"
 
     # Queue Configuration
     max_queue_size: int = 1000
