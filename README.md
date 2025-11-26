@@ -15,130 +15,100 @@ AI Agent Queue System with FastAPI and LangGraph - A production-ready message qu
 
 ## Architecture
 
+The Agent Queue System uses a queue-based architecture to ensure AI agents process requests sequentially while supporting priority management, streaming responses, and multi-turn conversations. This approach solves key problems that arise when building production AI applications.
+
+### Why This Architecture?
+
+**1. Sequential AI Processing**
+- **Problem**: AI agents (like LangGraph) aren't thread-safe and can produce inconsistent results when processing multiple requests concurrently
+- **Solution**: Queue ensures one message is processed at a time, maintaining agent state consistency
+
+**2. Priority Management**
+- **Problem**: All requests treated equally, urgent queries wait behind routine ones
+- **Solution**: Priority queue (HIGH → NORMAL → LOW) ensures important messages jump the line
+
+**3. Streaming Long Responses**
+- **Problem**: AI responses can take 10-30+ seconds, users stare at blank screens
+- **Solution**: Server-Sent Events (SSE) stream response chunks in real-time as the agent thinks
+
+**4. Conversation Context**
+- **Problem**: Traditional stateless APIs can't maintain multi-turn conversations
+- **Solution**: Optional `thread_id` groups related messages, enabling ChatGPT-like dialogues
+
+**5. Graceful Resource Management**
+- **Problem**: Concurrent AI requests overwhelm resources, causing failures
+- **Solution**: Queue provides backpressure—excess load becomes queued, not crashed
+
+### How It Works
+
 ```mermaid
-graph TB
-    subgraph "Client Layer"
-        UI[React Chat UI<br/>Multi-thread conversations]
-        TS[TypeScript Client<br/>API demos]
-        OTHER[Other Clients<br/>curl, Postman, etc.]
-    end
+flowchart LR
+    Client[Client Apps<br/>Chat UI, API Clients]
+    API[FastAPI Layer<br/>Submit, Status, Stream]
+    Queue[Queue Manager<br/>Priority + Threads]
+    Worker[Sequential Worker<br/>One at a time]
+    Agent[LangGraph Agent<br/>Streaming Response]
 
-    subgraph "API Layer - FastAPI"
-        MSG_SUBMIT[POST /messages<br/>Submit with thread_id]
-        MSG_STATUS[GET /messages/:id/status<br/>Check status]
-        MSG_STREAM[GET /messages/:id/stream<br/>SSE streaming]
-        MSG_CANCEL[DELETE /messages/:id<br/>Cancel message]
-        THREADS_LIST[GET /threads<br/>List all threads]
-        THREAD_MSGS[GET /threads/:id/messages<br/>Thread history]
-        THREAD_META[GET /threads/:id<br/>Thread metadata]
-        QUEUE_SUM[GET /queue<br/>Queue summary]
-    end
+    Client -->|1. Submit Message| API
+    API -->|2. Enqueue by Priority| Queue
+    Queue -->|3. Dequeue When Ready| Worker
+    Worker -->|4. Process & Stream| Agent
+    Agent -->|5. Chunks via SSE| Client
 
-    subgraph "Queue Manager - In-Memory"
-        PQUEUE[Priority Queue<br/>asyncio.PriorityQueue<br/>HIGH → NORMAL → LOW]
-        MSGS[Message Store<br/>Dict message_id → Message]
-
-        subgraph "Thread Tracking"
-            TIDX[Thread Index<br/>thread_id → Set msg_ids]
-            TMETA[Thread Metadata<br/>counts, states, activity]
-        end
-    end
-
-    subgraph "Processing Layer"
-        WORKER[Background Worker<br/>Sequential Processing<br/>One at a time]
-        AGENT[LangGraph Agent<br/>create_react_agent<br/>Streaming chunks]
-    end
-
-    subgraph "State Machine"
-        QUEUED[QUEUED]
-        PROCESSING[PROCESSING]
-        COMPLETED[COMPLETED]
-        FAILED[FAILED]
-        CANCELLED[CANCELLED]
-    end
-
-    %% Client to API
-    UI --> MSG_SUBMIT
-    UI --> MSG_STREAM
-    UI --> THREADS_LIST
-    UI --> THREAD_MSGS
-    TS --> MSG_SUBMIT
-    TS --> MSG_STATUS
-    OTHER --> MSG_SUBMIT
-
-    %% API to Queue Manager
-    MSG_SUBMIT --> PQUEUE
-    MSG_SUBMIT --> MSGS
-    MSG_SUBMIT --> TIDX
-    MSG_SUBMIT --> TMETA
-    MSG_STATUS --> MSGS
-    MSG_CANCEL --> MSGS
-    THREADS_LIST --> TMETA
-    THREAD_MSGS --> TIDX
-    THREAD_MSGS --> MSGS
-    THREAD_META --> TMETA
-    QUEUE_SUM --> MSGS
-
-    %% Queue to Worker
-    PQUEUE --> WORKER
-    WORKER --> MSGS
-    WORKER --> TMETA
-
-    %% Worker to Agent
-    WORKER --> AGENT
-    AGENT --> MSG_STREAM
-
-    %% State transitions
-    QUEUED -->|dequeue| PROCESSING
-    PROCESSING -->|success| COMPLETED
-    PROCESSING -->|error| FAILED
-    QUEUED -->|cancel| CANCELLED
-
-    %% Styling
-    classDef clientStyle fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
-    classDef apiStyle fill:#fff4e6,stroke:#f57c00,stroke-width:2px
-    classDef queueStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef threadStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef processStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef stateStyle fill:#fff,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5
-
-    class UI,TS,OTHER clientStyle
-    class MSG_SUBMIT,MSG_STATUS,MSG_STREAM,MSG_CANCEL,THREADS_LIST,THREAD_MSGS,THREAD_META,QUEUE_SUM apiStyle
-    class PQUEUE,MSGS,QUEUE_SUM queueStyle
-    class TIDX,TMETA threadStyle
-    class WORKER,AGENT processStyle
-    class QUEUED,PROCESSING,COMPLETED,FAILED,CANCELLED stateStyle
+    style Client fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    style API fill:#fff4e6,stroke:#f57c00,stroke-width:2px
+    style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style Worker fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style Agent fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 ```
 
-### Architecture Highlights
+### Request Flow Example
 
-**Client Layer**
-- React Chat UI provides a ChatGPT-like threaded conversation interface
-- TypeScript client demonstrates all API endpoints with detailed logging
-- Fully RESTful API supports any HTTP client
+Let's follow a message through the system:
 
-**API Layer (FastAPI)**
-- Message endpoints for submit, status, stream, and cancel operations
-- Thread endpoints for listing threads and retrieving conversation history
-- SSE streaming for real-time agent response delivery
-- Queue summary endpoint for monitoring and debugging
+**User sends:** "What is Python?"
 
-**Queue Manager (In-Memory)**
-- Priority queue ensures HIGH → NORMAL → LOW processing order
-- FIFO within same priority level using insertion counter
-- Thread tracking with O(1) lookups via index dictionaries
-- Real-time metadata updates on state transitions
+**Step 1: Client Submission**
+- POST `/messages` with message and optional `thread_id`
+- Returns `message_id` immediately (202 Accepted)
+- Message state: `QUEUED`, position: 3
 
-**Processing Layer**
-- Background worker processes one message at a time sequentially
-- LangGraph agent integration with streaming chunk capture
-- Automatic state transitions from QUEUED → PROCESSING → COMPLETED/FAILED
+**Step 2: Queue Manager**
+- Enqueues by priority (HIGH=1, NORMAL=2, LOW=3)
+- Stores message metadata
+- Updates thread index if `thread_id` provided
 
-**Threading System**
-- Optional `thread_id` groups related messages
-- Thread metadata tracks message counts, states, and activity
-- Backward compatible - works without thread_id
-- Enables multi-turn conversations with context preservation
+**Step 3: Worker Dequeue**
+- Background worker dequeues when ready (FIFO within priority)
+- Message state: `PROCESSING`
+- Calls LangGraph agent
+
+**Step 4: Agent Processing**
+- Agent generates response with streaming chunks
+- Each chunk sent via SSE to `/messages/{id}/stream`
+- Client displays chunks in real-time (typing effect)
+
+**Step 5: Completion**
+- Message state: `COMPLETED`
+- Full response stored in message `result`
+- Thread metadata updated (message count, last activity)
+
+### Key Benefits
+
+| Traditional REST API | Agent Queue System |
+|---------------------|-------------------|
+| Direct synchronous calls | Asynchronous queue-based |
+| Concurrent execution | Sequential processing |
+| Timeout on long requests | Streaming responses (SSE) |
+| Stateless, no conversations | Thread-based conversations |
+| No priority control | Priority queue (HIGH/NORMAL/LOW) |
+| Overload → failures | Overload → queuing |
+
+### Technical Details
+
+For implementation specifics, API references, data structures, and performance characteristics, see the [Architecture Documentation](docs/ARCHITECTURE.md).
+
+For thread tracking design and benefits, see the [Thread Architecture Guide](docs/THREAD_ARCHITECTURE.md).
 
 ## Installation
 
@@ -463,7 +433,7 @@ Best practices:
 | Variable             | Description                               | Default    |
 | -------------------- | ----------------------------------------- | ---------- |
 | `OPENAI_API_KEY`     | OpenAI API key for LangGraph              | (required) |
-| `MODEL_NAME`         | LLM model name                            | `gpt-4`    |
+| `MODEL_NAME`         | LLM model name                            | `gpt-5.1`    |
 | `MAX_QUEUE_SIZE`     | Maximum messages in queue                 | `1000`     |
 | `PROCESSING_TIMEOUT` | Max processing time per message (seconds) | `60`       |
 | `KEEPALIVE_INTERVAL` | SSE keepalive interval (seconds)          | `30`       |
