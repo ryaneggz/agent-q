@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shinzo.config import settings
-from shinzo.queue_manager import QueueManager
-from shinzo.agent_processor import AgentProcessor
+from shinzo.queue import QueueManager
+from shinzo.agent import AgentProcessor
 from shinzo.worker import Worker
 from shinzo.api import routes, streaming, threads
 from shinzo.utils import setup_logging, get_logger

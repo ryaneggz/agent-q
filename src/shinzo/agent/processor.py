@@ -1,14 +1,12 @@
-import asyncio
-from typing import Optional, AsyncGenerator
-from datetime import datetime
+"""Main AgentProcessor class for processing messages with LangGraph agents."""
 
-from langchain.chat_models import init_chat_model
-from langgraph.prebuilt import create_react_agent
+import asyncio
+from typing import AsyncGenerator
 
 from shinzo.models import QueuedMessage, MessageState
-from shinzo.queue_manager import QueueManager
+from shinzo.queue import QueueManager
 from shinzo.config import settings
-from shinzo.tools import get_company_info
+from shinzo.agent import initialization, streaming
 from shinzo.utils import get_logger
 
 
@@ -25,24 +23,7 @@ class AgentProcessor:
 
     def _initialize_agent(self):
         """Initialize the LangGraph agent"""
-        try:
-            # Initialize the LLM
-            llm = init_chat_model(
-                model=settings.model,
-                streaming=True,
-            )
-
-            # Create agent with tools
-            self.agent = create_react_agent(
-                model=llm,
-                tools=[get_company_info],
-            )
-
-            logger.info(f"Agent initialized with model: {settings.model}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize agent: {e}")
-            raise
+        self.agent = initialization.create_agent()
 
     async def process_message(self, message: QueuedMessage) -> None:
         """
@@ -100,7 +81,9 @@ class AgentProcessor:
 
         try:
             # Invoke agent with streaming
-            async for chunk in self._stream_agent(message):
+            async for chunk in streaming.stream_agent_response(
+                self.agent, message, self.queue_manager
+            ):
                 chunks.append(chunk)
                 # Store chunk in message for streaming to clients
                 await self.queue_manager.add_chunk(message.id, chunk)
@@ -123,48 +106,10 @@ class AgentProcessor:
         Yields:
             Chunks of the agent response
         """
-        try:
-            # Build conversation history if message is part of a thread
-            messages = []
-
-            if message.thread_id:
-                # Get all previous messages in the thread (chronologically)
-                thread_messages = await self.queue_manager.get_thread_messages(message.thread_id)
-
-                # Add previous messages to conversation history
-                for prev_msg in thread_messages:
-                    # Skip the current message (it will be added last)
-                    if prev_msg.id == message.id:
-                        continue
-
-                    # Add user message
-                    messages.append(("user", prev_msg.user_message))
-
-                    # Add assistant response if completed
-                    if prev_msg.result and prev_msg.state == MessageState.COMPLETED:
-                        messages.append(("assistant", prev_msg.result))
-
-            # Add current user message last
-            messages.append(("user", message.user_message))
-
-            # Prepare input for agent
-            inputs = {"messages": messages}
-
-            logger.info(f"Processing message with {len(messages)} messages in context (thread_id={message.thread_id})")
-
-            # Stream agent output
-            # Note: LangGraph's streaming may vary based on version
-            # This is a simplified implementation
-            async for event in self.agent.astream_events(inputs, version="v1"):
-                # Extract content from different event types
-                if event["event"] == "on_chat_model_stream":
-                    content = event["data"].get("chunk", {}).content
-                    if content:
-                        yield content
-
-        except Exception as e:
-            logger.error(f"Agent streaming error: {e}", exc_info=True)
-            raise
+        async for chunk in streaming.stream_agent_response(
+            self.agent, message, self.queue_manager
+        ):
+            yield chunk
 
     async def process_message_streaming(
         self, message: QueuedMessage
@@ -216,3 +161,4 @@ class AgentProcessor:
                 message.id, MessageState.FAILED, error=error_msg
             )
             raise
+

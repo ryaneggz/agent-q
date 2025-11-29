@@ -9,7 +9,7 @@ from shinzo.models import (
     ThreadMessagesResponse,
     ThreadSummary,
 )
-from shinzo.queue_manager import QueueManager
+from shinzo.queue import QueueManager
 from shinzo.utils import get_logger
 
 

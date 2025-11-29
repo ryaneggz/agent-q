@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from shinzo.queue_manager import QueueManager
+from shinzo.queue import QueueManager
 from shinzo.models import MessageState, Priority
 
 

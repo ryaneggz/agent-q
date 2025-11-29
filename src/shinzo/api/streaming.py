@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from shinzo.models import MessageState, SSEEvent
-from shinzo.queue_manager import QueueManager
+from shinzo.queue import QueueManager
 from shinzo.config import settings
 from shinzo.utils import get_logger
 
