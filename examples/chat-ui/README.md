@@ -28,7 +28,12 @@ npm install
 1. Make sure the Agent Queue System API is running:
 ```bash
 # From the project root
-uv run python -m app.main
+make dev
+```
+
+Or directly:
+```bash
+PYTHONPATH=src uv run python -m shinzo.main
 ```
 
 2. Start the dev server:

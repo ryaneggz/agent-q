@@ -32,7 +32,12 @@ OPENAI_API_KEY=sk-your-key-here
 ## Run the Server
 
 ```bash
-uv run python -m app.main
+make dev
+```
+
+Or directly:
+```bash
+PYTHONPATH=src uv run python -m shinzo.main
 ```
 
 The server will start on http://localhost:8000
@@ -99,9 +104,10 @@ curl http://localhost:8000/health
 
 ## Next Steps
 
-- Read the full [README.md](README.md) for detailed documentation
-- Explore the API docs at http://localhost:8000/docs
-- Check out the [OpenSpec proposal](openspec/changes/add-agent-queue-system/proposal.md) for architecture details
+- Read the full [README.md](../README.md) for detailed documentation
+- Explore the [API Reference](API.md) for endpoint details
+- Check out the [Architecture Guide](ARCHITECTURE.md) for system design
+- See the [Development Guide](DEVELOPMENT.md) for contributing
 
 ## Troubleshooting
 

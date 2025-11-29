@@ -35,14 +35,22 @@ AI Agent Queue System with FastAPI and LangGraph - A production-ready message qu
     ```
 
 3. **Run:**
+
     ```bash
-    uv run uvicorn app.main:app --reload
+    make dev
+    ```
+
+    Or directly:
+
+    ```bash
+    uv run uvicorn shinzo.main:app --reload
     ```
 
 The API will be available at `http://localhost:8000`.
 
 ## Documentation
 
+-   **[Quick Start Guide](docs/QUICKSTART.md)**: Get up and running in 5 minutes.
 -   **[API Reference](docs/API.md)**: Detailed endpoint documentation (Submit, Stream, Status, etc.).
 -   **[Configuration](docs/CONFIGURATION.md)**: Environment variables and settings.
 -   **[Development Guide](docs/DEVELOPMENT.md)**: Testing, code quality, and project structure.

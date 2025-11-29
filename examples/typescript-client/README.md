@@ -20,7 +20,12 @@ npm install
 In the project root directory:
 
 ```bash
-uv run python -m app.main
+make dev
+```
+
+Or directly:
+```bash
+PYTHONPATH=src uv run python -m shinzo.main
 ```
 
 The API should be running on http://localhost:8000
@@ -171,7 +176,7 @@ enum MessageState {
 
 ### "Failed to connect to API"
 
--   Make sure the Agent Queue System is running: `uv run python -m app.main`
+-   Make sure the Agent Queue System is running: `make dev`
 -   Check that it's listening on http://localhost:8000
 -   Verify no firewall is blocking the connection
 

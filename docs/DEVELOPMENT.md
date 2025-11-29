@@ -28,10 +28,15 @@
 
 ## Running the Server
 
-Start the development server with hot reload:
+Start the development server:
 
 ```bash
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+make dev
+```
+
+Or with uvicorn directly:
+```bash
+uv run uvicorn shinzo.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Testing
@@ -45,7 +50,7 @@ uv run pytest
 
 ### Run with coverage
 ```bash
-uv run pytest --cov=app --cov-report=html
+uv run pytest --cov=shinzo --cov-report=html
 ```
 
 ### Run specific tests
@@ -63,12 +68,12 @@ We use `black` for formatting and `ruff` for linting.
 
 ### Format code
 ```bash
-uv run black app tests
+uv run black src tests
 ```
 
 ### Lint code
 ```bash
-uv run ruff check app tests
+uv run ruff check src tests
 ```
 
 ## Project Structure

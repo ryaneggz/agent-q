@@ -79,7 +79,7 @@ async function checkHealth(): Promise<HealthResponse> {
             `${COLORS.dim}  Make sure the Agent Queue System is running${COLORS.reset}`
         );
         console.error(
-            `${COLORS.dim}  Start it with: uv run python -m app.main${COLORS.reset}`
+            `${COLORS.dim}  Start it with: make dev${COLORS.reset}`
         );
         throw error;
     }
