@@ -58,7 +58,7 @@ const markdownComponents: Components = {
     <ul className="list-disc list-inside mb-2 space-y-1" {...props} />
   ),
   ol: ({ ...props }) => (
-    <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />
+    <ol className="list-decimal mb-2 space-y-1" {...props} />
   ),
   blockquote: ({ ...props }) => (
     <blockquote
