@@ -78,9 +78,7 @@ async function checkHealth(): Promise<HealthResponse> {
         console.error(
             `${COLORS.dim}  Make sure the Agent Queue System is running${COLORS.reset}`
         );
-        console.error(
-            `${COLORS.dim}  Start it with: make dev${COLORS.reset}`
-        );
+        console.error(`${COLORS.dim}  Start it with: make dev${COLORS.reset}`);
         throw error;
     }
 }

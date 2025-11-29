@@ -2,26 +2,30 @@
 
 ## Prerequisites
 
-- Python 3.10+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+-   Python 3.10+
+-   [uv](https://github.com/astral-sh/uv) (recommended) or pip
 
 ## Installation
 
 1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd agent-queue-system
-   ```
+
+    ```bash
+    git clone <repository-url>
+    cd agent-queue-system
+    ```
 
 2. **Install dependencies:**
    Using `uv`:
-   ```bash
-   uv sync
-   ```
-   Or using `pip`:
-   ```bash
-   pip install -r requirements.txt
-   ```
+
+    ```bash
+    uv sync
+    ```
+
+    Or using `pip`:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 3. **Configure environment:**
    See [Configuration](CONFIGURATION.md) for details.
@@ -35,6 +39,7 @@ make dev
 ```
 
 Or with uvicorn directly:
+
 ```bash
 uv run uvicorn shinzo.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -44,16 +49,19 @@ uv run uvicorn shinzo.main:app --reload --host 0.0.0.0 --port 8000
 We use `pytest` for unit and integration testing.
 
 ### Run all tests
+
 ```bash
 uv run pytest
 ```
 
 ### Run with coverage
+
 ```bash
 uv run pytest --cov=shinzo --cov-report=html
 ```
 
 ### Run specific tests
+
 ```bash
 # Unit tests
 uv run pytest tests/unit/
@@ -67,11 +75,13 @@ uv run pytest tests/integration/
 We use `black` for formatting and `ruff` for linting.
 
 ### Format code
+
 ```bash
 uv run black src tests
 ```
 
 ### Lint code
+
 ```bash
 uv run ruff check src tests
 ```
@@ -98,4 +108,3 @@ config/                  # Config files
 pyproject.toml           # Project dependencies
 README.md                # Project overview
 ```
-
