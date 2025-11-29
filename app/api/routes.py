@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import Optional
 import logging
+import uuid
 
 from app.models import (
     MessageSubmitRequest,
@@ -43,11 +44,14 @@ async def submit_message(request: MessageSubmitRequest):
         )
 
     try:
+        # Generate thread_id if not provided
+        thread_id = request.thread_id or str(uuid.uuid4())
+        
         # Enqueue the message
         message = await queue_manager.enqueue(
             user_message=request.message,
             priority=request.priority,
-            thread_id=request.thread_id,
+            thread_id=thread_id,
         )
 
         # Get queue position

@@ -18,6 +18,7 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load threads on mount
   useEffect(() => {
@@ -39,6 +40,11 @@ export function ChatInterface() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, streamingContent]);
+
+  // Auto-focus input on mount and when starting new thread
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [currentThreadId]);
 
   const loadThreads = async () => {
     try {
@@ -110,29 +116,37 @@ export function ChatInterface() {
     setInputValue("");
 
     try {
-      // Generate thread ID if this is a new conversation
-      const threadId = currentThreadId || `thread-${Date.now()}`;
       const isNewThread = !currentThreadId;
 
-      // Submit message
-      await apiClient.submitMessage({
+      // Submit message - thread_id is optional and will be generated on backend if not provided
+      const response = await apiClient.submitMessage({
         message: messageText,
         priority: Priority.NORMAL,
-        thread_id: threadId,
+        thread_id: currentThreadId,
       });
 
-      // If new thread, set as current which will trigger useEffect to load messages
-      if (isNewThread) {
-        setCurrentThreadId(threadId);
+      // If new thread, set the thread_id returned by the backend
+      if (isNewThread && response.thread_id) {
+        setCurrentThreadId(response.thread_id);
         await loadThreads();
-      } else {
-        // For existing thread, reload messages to show the new one
+      }
+
+      // Reload messages to show the newly submitted message
+      const threadId = response.thread_id || currentThreadId;
+      if (threadId) {
         await loadThreadMessages(threadId);
       }
+
+      // Start streaming the response immediately
+      startStreaming(response.message_id);
     } catch (error) {
       console.error("Failed to submit message:", error);
     } finally {
       setIsLoading(false);
+      // Refocus input after submission - use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -203,6 +217,7 @@ export function ChatInterface() {
           <div className="border-t p-4">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
+                ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Type your message..."

@@ -9,6 +9,7 @@ from langgraph.prebuilt import create_react_agent
 from app.models import QueuedMessage, MessageState
 from app.queue_manager import QueueManager
 from app.config import settings
+from app.tools import get_company_info
 
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,10 @@ class AgentProcessor:
                 streaming=True,
             )
 
-            # Create agent with basic tools (can be extended)
-            # For MVP, we'll create a simple agent without tools
+            # Create agent with tools
             self.agent = create_react_agent(
                 model=llm,
-                tools=[],  # Add your tools here as needed
+                tools=[get_company_info],
             )
 
             logger.info(f"Agent initialized with model: {settings.model_name}")
@@ -125,8 +125,33 @@ class AgentProcessor:
             Chunks of the agent response
         """
         try:
+            # Build conversation history if message is part of a thread
+            messages = []
+
+            if message.thread_id:
+                # Get all previous messages in the thread (chronologically)
+                thread_messages = await self.queue_manager.get_thread_messages(message.thread_id)
+
+                # Add previous messages to conversation history
+                for prev_msg in thread_messages:
+                    # Skip the current message (it will be added last)
+                    if prev_msg.id == message.id:
+                        continue
+
+                    # Add user message
+                    messages.append(("user", prev_msg.user_message))
+
+                    # Add assistant response if completed
+                    if prev_msg.result and prev_msg.state == MessageState.COMPLETED:
+                        messages.append(("assistant", prev_msg.result))
+
+            # Add current user message last
+            messages.append(("user", message.user_message))
+
             # Prepare input for agent
-            inputs = {"messages": [("user", message.user_message)]}
+            inputs = {"messages": messages}
+
+            logger.info(f"Processing message with {len(messages)} messages in context (thread_id={message.thread_id})")
 
             # Stream agent output
             # Note: LangGraph's streaming may vary based on version
