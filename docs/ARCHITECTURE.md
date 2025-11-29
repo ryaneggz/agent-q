@@ -148,7 +148,7 @@ graph TB
 
 ### Queue Manager (In-Memory)
 
-**Priority Queue** (`app/queue_manager.py`)
+**Priority Queue** (`src/shinzo/queue/manager.py`)
 - Uses `asyncio.PriorityQueue` for ordering
 - Priority mapping: HIGH=1, NORMAL=2, LOW=3
 - FIFO within same priority using counter
@@ -168,14 +168,14 @@ graph TB
 
 ### Processing Layer
 
-**Background Worker** (`app/worker.py`)
+**Background Worker** (`src/shinzo/worker/manager.py`)
 - Runs as asyncio background task
 - Waits for queue events
 - Dequeues one message at a time
 - Processes sequentially (no parallelism)
 - Handles graceful shutdown
 
-**LangGraph Agent** (`app/agent_processor.py`)
+**LangGraph Agent** (`src/shinzo/agent/processor.py`)
 - Uses `create_react_agent` from LangGraph
 - Captures streaming chunks during processing
 - Stores chunks in message metadata
