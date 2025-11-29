@@ -4,8 +4,8 @@ A comprehensive TypeScript demonstration of the Agent Queue System API. This scr
 
 ## Prerequisites
 
-- **Node.js 18+** (for native fetch API support)
-- **Agent Queue System running** on `http://localhost:8000`
+-   **Node.js 18+** (for native fetch API support)
+-   **Agent Queue System running** on `http://localhost:8000`
 
 ## Installation
 
@@ -33,53 +33,55 @@ npm run demo
 
 ## What the Demo Does
 
-The script demonstrates a complete workflow through 9 steps:
+The script demonstrates a complete workflow through 12 steps:
 
 ### 1️⃣ **Health Check**
-Verifies the API server is running and healthy
 
-### 2️⃣ **Submit Normal Priority Message**
-Submits a message with normal priority to the queue
-```typescript
-"What is the capital of France?" - Priority: NORMAL
-```
+Verifies the API server is running and healthy.
 
-### 3️⃣ **Submit High Priority Message**
-Submits an urgent message that jumps ahead in the queue
-```typescript
-"Urgent: Calculate 2+2" - Priority: HIGH
-```
+### 2️⃣ **Start Threaded Conversation**
 
-### 4️⃣ **Submit Low Priority Message**
-Submits a low priority message that processes last
-```typescript
-"Tell me a joke" - Priority: LOW
-```
+Creates a client-side UUID and submits the first turn in a conversation thread.
 
-### 5️⃣ **Check Queue Summary**
-Displays the current state of the queue showing:
-- Total messages in each state (queued, processing, completed, failed, cancelled)
-- List of queued messages with priorities
-- Currently processing message
+### 3️⃣ **Submit Follow-up in the Same Thread**
 
-### 6️⃣ **Check Message Status**
-Queries the status of a specific message showing:
-- Current state
-- Queue position (if queued)
-- Result (if completed)
-- Timestamps
+Adds a second message with the same `thread_id` to maintain context.
 
-### 7️⃣ **Stream Message Response (SSE)**
-Demonstrates real-time streaming of agent responses using Server-Sent Events:
-- Waiting events while message is queued
-- Content chunks as the agent generates them
-- Completion/error/cancellation events
+### 4️⃣ **List Threads**
 
-### 8️⃣ **Cancel Queued Message**
-Attempts to cancel the low priority message before it processes
+Calls `GET /threads` to display every active thread with summary metadata.
 
-### 9️⃣ **Final Queue Summary**
-Shows the final state of the queue after all operations
+### 5️⃣ **Inspect Thread Metadata & Messages**
+
+Shows how to query thread-level stats and retrieve the chronological message list.
+
+### 6️⃣ **Submit Normal Priority Message**
+
+Submits a standalone message (no thread) using the default priority.
+
+### 7️⃣ **Submit High Priority Message**
+
+Demonstrates how urgent work jumps ahead in the queue.
+
+### 8️⃣ **Submit Low Priority Message**
+
+Adds a background request that will be processed last.
+
+### 9️⃣ **Check Queue Summary**
+
+Displays the overall queue health, counts per state, and queued message previews.
+
+### 🔟 **Check Message Status**
+
+Queries the status endpoint for the normal-priority message, including its optional thread info.
+
+### 1️⃣1️⃣ **Stream Message Response (SSE)**
+
+Streams real-time events for the high-priority message, showcasing waiting/chunk/done events.
+
+### 1️⃣2️⃣ **Cancel Queued Message & Final Summary**
+
+Attempts to cancel the low priority job and then prints the final queue summary.
 
 ## Example Output
 
@@ -125,21 +127,24 @@ Note: This will stream real-time events from the agent
 
 ## API Endpoints Demonstrated
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/health` | GET | Health check |
-| `/messages` | POST | Submit message |
-| `/messages/{id}/status` | GET | Check message status |
-| `/messages/{id}/stream` | GET | Stream SSE events |
-| `/messages/{id}` | DELETE | Cancel message |
-| `/queue` | GET | Get queue summary |
+| Endpoint                        | Method | Purpose                                          |
+| ------------------------------- | ------ | ------------------------------------------------ |
+| `/health`                       | GET    | Health check                                     |
+| `/messages`                     | POST   | Submit message (with optional `thread_id`)       |
+| `/messages/{id}/status`         | GET    | Check message status                             |
+| `/messages/{id}/stream`         | GET    | Stream SSE events                                |
+| `/messages/{id}`                | DELETE | Cancel message                                   |
+| `/queue`                        | GET    | Get queue summary                                |
+| `/threads`                      | GET    | List threads with summary metadata               |
+| `/threads/{thread_id}`          | GET    | Retrieve thread metadata (counts, last activity) |
+| `/threads/{thread_id}/messages` | GET    | Fetch chronological messages within a thread     |
 
 ## Files
 
-- **`client-demo.ts`** - Main demo script with all API functions
-- **`types.ts`** - TypeScript interfaces matching the API models
-- **`package.json`** - Dependencies and scripts
-- **`tsconfig.json`** - TypeScript configuration
+-   **`client-demo.ts`** - Main demo script with all API functions
+-   **`types.ts`** - TypeScript interfaces matching the API models
+-   **`package.json`** - Dependencies and scripts
+-   **`tsconfig.json`** - TypeScript configuration
 
 ## Type Safety
 
@@ -147,42 +152,46 @@ All API responses are fully typed with TypeScript interfaces that match the Pyda
 
 ```typescript
 interface MessageSubmitResponse {
-  message_id: string;
-  state: MessageState;
-  queue_position: number | null;
-  created_at: string;
+    message_id: string;
+    state: MessageState;
+    queue_position: number | null;
+    created_at: string;
 }
 
 enum MessageState {
-  QUEUED = "queued",
-  PROCESSING = "processing",
-  COMPLETED = "completed",
-  FAILED = "failed",
-  CANCELLED = "cancelled",
+    QUEUED = "queued",
+    PROCESSING = "processing",
+    COMPLETED = "completed",
+    FAILED = "failed",
+    CANCELLED = "cancelled",
 }
 ```
 
 ## Troubleshooting
 
 ### "Failed to connect to API"
-- Make sure the Agent Queue System is running: `uv run python -m app.main`
-- Check that it's listening on http://localhost:8000
-- Verify no firewall is blocking the connection
+
+-   Make sure the Agent Queue System is running: `uv run python -m app.main`
+-   Check that it's listening on http://localhost:8000
+-   Verify no firewall is blocking the connection
 
 ### "Message not found" errors
-- The demo may run faster than the agent can process messages
-- This is normal and demonstrates error handling
-- The agent needs an OpenAI API key to actually process messages
+
+-   The demo may run faster than the agent can process messages
+-   This is normal and demonstrates error handling
+-   The agent needs an OpenAI API key to actually process messages
 
 ### SSE stream doesn't show chunks
-- The agent needs to be configured with a valid OpenAI API key
-- Check `.env` file in the project root has `OPENAI_API_KEY` set
-- Without a valid key, messages will fail rather than complete
+
+-   The agent needs to be configured with a valid OpenAI API key
+-   Check `.env` file in the project root has `OPENAI_API_KEY` set
+-   Without a valid key, messages will fail rather than complete
 
 ### Type errors when building
-- Run `npm run type-check` to see TypeScript errors
-- Ensure TypeScript version is 5.3.0 or higher
-- Check that `@types/node` is installed
+
+-   Run `npm run type-check` to see TypeScript errors
+-   Ensure TypeScript version is 5.3.0 or higher
+-   Check that `@types/node` is installed
 
 ## Environment Variables
 
@@ -195,11 +204,13 @@ API_BASE_URL=http://localhost:8080 npm run demo
 ## Development
 
 ### Type checking only (no execution)
+
 ```bash
 npm run type-check
 ```
 
 ### Build to JavaScript
+
 ```bash
 npm run build
 ```
@@ -217,11 +228,11 @@ This demo script can serve as a starting point for building your own client:
 
 ## Notes
 
-- The demo uses native `fetch` API (Node.js 18+)
-- No external HTTP libraries required
-- Console output uses ANSI color codes for readability
-- SSE streaming is implemented with manual parsing (educational)
-- Error handling is basic for demonstration purposes
+-   The demo uses native `fetch` API (Node.js 18+)
+-   No external HTTP libraries required
+-   Console output uses ANSI color codes for readability
+-   SSE streaming is implemented with manual parsing (educational)
+-   Error handling is basic for demonstration purposes
 
 ## License
 

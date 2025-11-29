@@ -1,18 +1,19 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import Optional
-import logging
+import uuid
 
-from app.models import (
+from shinzo.models import (
     MessageSubmitRequest,
     MessageSubmitResponse,
     MessageStatusResponse,
     QueueSummaryResponse,
     MessageState,
 )
-from app.queue_manager import QueueManager
+from shinzo.queue import QueueManager
+from shinzo.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter()
 
 # This will be injected by the main app
@@ -43,9 +44,13 @@ async def submit_message(request: MessageSubmitRequest):
         )
 
     try:
+        # Generate thread_id if not provided by client
+        thread_id = request.thread_id or str(uuid.uuid4())
+        
         # Enqueue the message
         message = await queue_manager.enqueue(
             user_message=request.message,
+            thread_id=thread_id,
             priority=request.priority,
         )
 
@@ -62,6 +67,7 @@ async def submit_message(request: MessageSubmitRequest):
             state=message.state,
             queue_position=queue_position,
             created_at=message.created_at,
+            thread_id=message.thread_id,
         )
 
     except Exception as e:
@@ -113,6 +119,7 @@ async def get_message_status(message_id: str):
         result=message.result,
         error=message.error,
         queue_position=queue_position,
+        thread_id=message.thread_id,
     )
 
 

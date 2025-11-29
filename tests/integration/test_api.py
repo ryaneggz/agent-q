@@ -1,14 +1,11 @@
 import pytest
-from httpx import AsyncClient
-from app.main import app
-from app.models import Priority
+from shinzo.models import Priority
 
 
 @pytest.mark.asyncio
-async def test_root_endpoint():
+async def test_root_endpoint(api_client):
     """Test the root endpoint"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/")
+    response = await api_client.get("/")
 
     assert response.status_code == 200
     data = response.json()
@@ -17,10 +14,9 @@ async def test_root_endpoint():
 
 
 @pytest.mark.asyncio
-async def test_health_check():
+async def test_health_check(api_client):
     """Test health check endpoint"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/health")
+    response = await api_client.get("/health")
 
     assert response.status_code == 200
     data = response.json()
@@ -28,16 +24,15 @@ async def test_health_check():
 
 
 @pytest.mark.asyncio
-async def test_submit_message():
+async def test_submit_message(api_client):
     """Test submitting a message"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post(
-            "/messages",
-            json={
-                "message": "Test message",
-                "priority": "normal"
-            }
-        )
+    response = await api_client.post(
+        "/messages",
+        json={
+            "message": "Test message",
+            "priority": "normal"
+        }
+    )
 
     assert response.status_code == 202
     data = response.json()
@@ -47,16 +42,15 @@ async def test_submit_message():
 
 
 @pytest.mark.asyncio
-async def test_submit_message_with_high_priority():
+async def test_submit_message_with_high_priority(api_client):
     """Test submitting a high priority message"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post(
-            "/messages",
-            json={
-                "message": "Urgent message",
-                "priority": "high"
-            }
-        )
+    response = await api_client.post(
+        "/messages",
+        json={
+            "message": "Urgent message",
+            "priority": "high"
+        }
+    )
 
     assert response.status_code == 202
     data = response.json()
@@ -64,18 +58,17 @@ async def test_submit_message_with_high_priority():
 
 
 @pytest.mark.asyncio
-async def test_get_message_status():
+async def test_get_message_status(api_client):
     """Test getting message status"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Submit a message
-        submit_response = await client.post(
-            "/messages",
-            json={"message": "Test message"}
-        )
-        message_id = submit_response.json()["message_id"]
+    # Submit a message
+    submit_response = await api_client.post(
+        "/messages",
+        json={"message": "Test message"}
+    )
+    message_id = submit_response.json()["message_id"]
 
-        # Get status
-        status_response = await client.get(f"/messages/{message_id}/status")
+    # Get status
+    status_response = await api_client.get(f"/messages/{message_id}/status")
 
     assert status_response.status_code == 200
     data = status_response.json()
@@ -85,37 +78,34 @@ async def test_get_message_status():
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_message_status():
+async def test_get_nonexistent_message_status(api_client):
     """Test getting status of non-existent message"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/messages/nonexistent-id/status")
+    response = await api_client.get("/messages/nonexistent-id/status")
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_cancel_queued_message():
+async def test_cancel_queued_message(api_client):
     """Test cancelling a queued message"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Submit a message
-        submit_response = await client.post(
-            "/messages",
-            json={"message": "Test message"}
-        )
-        message_id = submit_response.json()["message_id"]
+    # Submit a message
+    submit_response = await api_client.post(
+        "/messages",
+        json={"message": "Test message"}
+    )
+    message_id = submit_response.json()["message_id"]
 
-        # Cancel immediately (before it processes)
-        cancel_response = await client.delete(f"/messages/{message_id}")
+    # Cancel immediately (before it processes)
+    cancel_response = await api_client.delete(f"/messages/{message_id}")
 
     # May succeed or fail depending on timing
     assert cancel_response.status_code in [200, 409]
 
 
 @pytest.mark.asyncio
-async def test_get_queue_summary():
+async def test_get_queue_summary(api_client):
     """Test getting queue summary"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/queue")
+    response = await api_client.get("/queue")
 
     assert response.status_code == 200
     data = response.json()
@@ -126,29 +116,27 @@ async def test_get_queue_summary():
 
 
 @pytest.mark.asyncio
-async def test_message_validation():
+async def test_message_validation(api_client):
     """Test message validation"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Empty message should fail
-        response = await client.post(
-            "/messages",
-            json={"message": ""}
-        )
+    # Empty message should fail
+    response = await api_client.post(
+        "/messages",
+        json={"message": ""}
+    )
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_priority_validation():
+async def test_priority_validation(api_client):
     """Test priority validation"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Invalid priority should fail
-        response = await client.post(
-            "/messages",
-            json={
-                "message": "Test",
-                "priority": "invalid"
-            }
-        )
+    # Invalid priority should fail
+    response = await api_client.post(
+        "/messages",
+        json={
+            "message": "Test",
+            "priority": "invalid"
+        }
+    )
 
     assert response.status_code == 422

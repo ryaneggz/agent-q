@@ -13,7 +13,7 @@ COPY pyproject.toml ./
 RUN uv sync --frozen --no-dev
 
 # Copy application code
-COPY app/ ./app/
+COPY src/ ./src/
 COPY .env.example ./.env
 
 # Expose port
@@ -23,5 +23,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')"
 
+# Set PYTHONPATH to include src directory
+ENV PYTHONPATH=/app/src
+
 # Run application
-CMD ["uv", "run", "python", "-m", "app.main"]
+CMD ["uv", "run", "python", "-m", "shinzo.main"]

@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime
-from app.models import (
+from shinzo.models import (
     MessageState,
     Priority,
     QueuedMessage,

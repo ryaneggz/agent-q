@@ -1,17 +1,16 @@
+"""Main AgentProcessor class for processing messages with LangGraph agents."""
+
 import asyncio
-import logging
-from typing import Optional, AsyncGenerator
-from datetime import datetime
+from typing import AsyncGenerator
 
-from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
-
-from app.models import QueuedMessage, MessageState
-from app.queue_manager import QueueManager
-from app.config import settings
+from shinzo.models import QueuedMessage, MessageState
+from shinzo.queue import QueueManager
+from shinzo.config import settings
+from shinzo.agent import initialization, streaming
+from shinzo.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AgentProcessor:
@@ -24,26 +23,7 @@ class AgentProcessor:
 
     def _initialize_agent(self):
         """Initialize the LangGraph agent"""
-        try:
-            # Initialize the LLM
-            llm = ChatOpenAI(
-                model=settings.model_name,
-                api_key=settings.openai_api_key,
-                streaming=True,
-            )
-
-            # Create agent with basic tools (can be extended)
-            # For MVP, we'll create a simple agent without tools
-            self.agent = create_react_agent(
-                model=llm,
-                tools=[],  # Add your tools here as needed
-            )
-
-            logger.info(f"Agent initialized with model: {settings.model_name}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize agent: {e}")
-            raise
+        self.agent = initialization.create_agent()
 
     async def process_message(self, message: QueuedMessage) -> None:
         """
@@ -101,7 +81,9 @@ class AgentProcessor:
 
         try:
             # Invoke agent with streaming
-            async for chunk in self._stream_agent(message):
+            async for chunk in streaming.stream_agent_response(
+                self.agent, message, self.queue_manager
+            ):
                 chunks.append(chunk)
                 # Store chunk in message for streaming to clients
                 await self.queue_manager.add_chunk(message.id, chunk)
@@ -124,23 +106,10 @@ class AgentProcessor:
         Yields:
             Chunks of the agent response
         """
-        try:
-            # Prepare input for agent
-            inputs = {"messages": [("user", message.user_message)]}
-
-            # Stream agent output
-            # Note: LangGraph's streaming may vary based on version
-            # This is a simplified implementation
-            async for event in self.agent.astream_events(inputs, version="v1"):
-                # Extract content from different event types
-                if event["event"] == "on_chat_model_stream":
-                    content = event["data"].get("chunk", {}).content
-                    if content:
-                        yield content
-
-        except Exception as e:
-            logger.error(f"Agent streaming error: {e}", exc_info=True)
-            raise
+        async for chunk in streaming.stream_agent_response(
+            self.agent, message, self.queue_manager
+        ):
+            yield chunk
 
     async def process_message_streaming(
         self, message: QueuedMessage
@@ -192,3 +161,4 @@ class AgentProcessor:
                 message.id, MessageState.FAILED, error=error_msg
             )
             raise
+

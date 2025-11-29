@@ -1,22 +1,19 @@
-import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.queue_manager import QueueManager
-from app.agent_processor import AgentProcessor
-from app.worker import Worker
-from app.api import routes, streaming
+from shinzo.config import settings
+from shinzo.queue import QueueManager
+from shinzo.agent import AgentProcessor
+from shinzo.worker import Worker
+from shinzo.api import routes, streaming, threads
+from shinzo.utils import setup_logging, get_logger
 
 
 # Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+setup_logging()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Global instances
 queue_manager: QueueManager = None
@@ -45,6 +42,7 @@ async def lifespan(app: FastAPI):
         # Inject queue_manager into routers
         routes.set_queue_manager(queue_manager)
         streaming.set_queue_manager(queue_manager)
+        threads.set_queue_manager(queue_manager)
 
         # Start worker
         await worker.start()
@@ -86,6 +84,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(routes.router, tags=["messages"])
+app.include_router(threads.router, tags=["threads"])
 app.include_router(streaming.router, tags=["streaming"])
 
 
@@ -103,7 +102,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "app.main:app",
+        "shinzo.main:app",
         host=settings.host,
         port=settings.port,
         reload=True,

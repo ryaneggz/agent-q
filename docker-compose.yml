@@ -16,7 +16,7 @@ services:
       - PORT=8000
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - ./app:/app/app:ro
+      - ./src:/app/src:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

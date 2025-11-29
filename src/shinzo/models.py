@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict
 from pydantic import BaseModel, Field
 import uuid
 
@@ -35,6 +35,7 @@ class QueuedMessage(BaseModel):
     user_message: str
     priority: Priority = Priority.NORMAL
     state: MessageState = MessageState.QUEUED
+    thread_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -50,6 +51,7 @@ class MessageSubmitRequest(BaseModel):
     """Request model for submitting a new message"""
     message: str = Field(..., min_length=1, max_length=10000)
     priority: Priority = Priority.NORMAL
+    thread_id: Optional[str] = Field(None, max_length=255)
 
 
 class MessageSubmitResponse(BaseModel):
@@ -58,6 +60,7 @@ class MessageSubmitResponse(BaseModel):
     state: MessageState
     queue_position: Optional[int] = None
     created_at: datetime
+    thread_id: Optional[str] = None
 
 
 class MessageStatusResponse(BaseModel):
@@ -72,6 +75,7 @@ class MessageStatusResponse(BaseModel):
     result: Optional[str] = None
     error: Optional[str] = None
     queue_position: Optional[int] = None
+    thread_id: Optional[str] = None
 
 
 class QueueSummaryResponse(BaseModel):
@@ -103,3 +107,28 @@ class SSEEvent(BaseModel):
         lines.append("")  # Empty line to end event
 
         return "\n".join(lines) + "\n"
+
+
+class ThreadMetadata(BaseModel):
+    """Thread-level metadata"""
+    thread_id: str
+    message_count: int
+    created_at: datetime
+    last_activity: datetime
+    states: Dict[MessageState, int]
+
+
+class ThreadSummary(BaseModel):
+    """Summary info for listing threads"""
+    thread_id: str
+    message_count: int
+    created_at: datetime
+    last_activity: datetime
+    last_message_preview: Optional[str] = None
+
+
+class ThreadMessagesResponse(BaseModel):
+    """Response model for thread message queries"""
+    thread_id: str
+    total_messages: int
+    messages: list[MessageStatusResponse]
