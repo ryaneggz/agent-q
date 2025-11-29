@@ -30,9 +30,27 @@ AI Agent Queue System with FastAPI and LangGraph - A production-ready message qu
 2. **Configure:**
 
     ```bash
-    cp .env.example .env
-    # Edit .env and set OPENAI_API_KEY
+    cp .example.env .env
+    # Edit .env and set your API keys
     ```
+
+    **Environment Variables:**
+
+    | Variable             | Description                                         | Default   | Required |
+    | -------------------- | --------------------------------------------------- | --------- | -------- |
+    | `OPENAI_API_KEY`     | OpenAI API key                                      | -         | Yes\*    |
+    | `GOOGLE_API_KEY`     | Google API key                                      | -         | No       |
+    | `GROQ_API_KEY`       | Groq API key                                        | -         | No       |
+    | `ANTHROPIC_API_KEY`  | Anthropic API key                                   | -         | No       |
+    | `XAI_API_KEY`        | xAI API key                                         | -         | No       |
+    | `MAX_QUEUE_SIZE`     | Maximum messages in queue                           | `1000`    | No       |
+    | `PROCESSING_TIMEOUT` | Max processing time per message (seconds)           | `60`      | No       |
+    | `KEEPALIVE_INTERVAL` | SSE keepalive interval (seconds)                    | `30`      | No       |
+    | `HOST`               | Server host address                                 | `0.0.0.0` | No       |
+    | `PORT`               | Server port                                         | `8000`    | No       |
+    | `LOG_LEVEL`          | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO`    | No       |
+
+    \*At least one API key is required (OpenAI, Google, Groq, Anthropic, or xAI)
 
 3. **Run:**
 
