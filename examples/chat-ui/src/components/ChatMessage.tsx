@@ -4,44 +4,44 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ChatMessageProps {
   message: MessageStatusResponse;
   streamingContent?: string;
 }
 
+const getStateIcon = (state: MessageState) => {
+  switch (state) {
+    case MessageState.QUEUED:
+      return <Clock className="h-4 w-4" />;
+    case MessageState.PROCESSING:
+      return <Loader2 className="h-4 w-4 animate-spin" />;
+    case MessageState.COMPLETED:
+      return <CheckCircle2 className="h-4 w-4" />;
+    case MessageState.FAILED:
+    case MessageState.CANCELLED:
+      return <XCircle className="h-4 w-4" />;
+  }
+};
+
+const getStateColor = (state: MessageState): "default" | "secondary" | "destructive" | "outline" => {
+  switch (state) {
+    case MessageState.QUEUED:
+      return "secondary";
+    case MessageState.PROCESSING:
+    case MessageState.COMPLETED:
+      return "default";
+    case MessageState.FAILED:
+    case MessageState.CANCELLED:
+      return "destructive";
+    default:
+      return "default";
+  }
+};
+
 export function ChatMessage({ message, streamingContent }: ChatMessageProps) {
   const isStreaming = message.state === MessageState.PROCESSING && streamingContent;
-
-  const getStateIcon = () => {
-    switch (message.state) {
-      case MessageState.QUEUED:
-        return <Clock className="h-4 w-4" />;
-      case MessageState.PROCESSING:
-        return <Loader2 className="h-4 w-4 animate-spin" />;
-      case MessageState.COMPLETED:
-        return <CheckCircle2 className="h-4 w-4" />;
-      case MessageState.FAILED:
-        return <XCircle className="h-4 w-4" />;
-      case MessageState.CANCELLED:
-        return <XCircle className="h-4 w-4" />;
-    }
-  };
-
-  const getStateColor = () => {
-    switch (message.state) {
-      case MessageState.QUEUED:
-        return "secondary";
-      case MessageState.PROCESSING:
-        return "default";
-      case MessageState.COMPLETED:
-        return "default";
-      case MessageState.FAILED:
-        return "destructive";
-      case MessageState.CANCELLED:
-        return "destructive";
-    }
-  };
 
   return (
     <div className="space-y-2">
@@ -65,10 +65,10 @@ export function ChatMessage({ message, streamingContent }: ChatMessageProps) {
         <Card className={cn("mr-auto max-w-[80%]")}>
           <CardContent className="p-3">
             <div className="flex items-start gap-2">
-              <div className="mt-0.5">{getStateIcon()}</div>
-              <div className="flex-1 space-y-2">
+              <div className="mt-0.5">{getStateIcon(message.state)}</div>
+              <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Badge variant={getStateColor()} className="text-xs">
+                  <Badge variant={getStateColor(message.state)} className="text-xs">
                     {message.state}
                   </Badge>
                 </div>
@@ -78,11 +78,11 @@ export function ChatMessage({ message, streamingContent }: ChatMessageProps) {
                 )}
 
                 {isStreaming && (
-                  <p className="text-sm whitespace-pre-wrap">{streamingContent}</p>
+                  <MarkdownRenderer content={streamingContent} />
                 )}
 
                 {message.result && !isStreaming && (
-                  <p className="text-sm whitespace-pre-wrap">{message.result}</p>
+                  <MarkdownRenderer content={message.result} />
                 )}
               </div>
             </div>
