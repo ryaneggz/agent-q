@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from app.queue_manager import QueueManager
-from app.models import MessageState, Priority
+from shinzo.queue_manager import QueueManager
+from shinzo.models import MessageState, Priority
 
 
 @pytest.mark.asyncio

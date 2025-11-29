@@ -1,9 +1,9 @@
 import asyncio
 from typing import Optional, Dict
 
-from app.queue_manager import QueueManager
-from app.agent_processor import AgentProcessor
-from app.utils import get_logger
+from shinzo.queue_manager import QueueManager
+from shinzo.agent_processor import AgentProcessor
+from shinzo.utils import get_logger
 
 
 logger = get_logger(__name__)

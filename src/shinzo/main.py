@@ -2,12 +2,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.queue_manager import QueueManager
-from app.agent_processor import AgentProcessor
-from app.worker import Worker
-from app.api import routes, streaming, threads
-from app.utils import setup_logging, get_logger
+from shinzo.config import settings
+from shinzo.queue_manager import QueueManager
+from shinzo.agent_processor import AgentProcessor
+from shinzo.worker import Worker
+from shinzo.api import routes, streaming, threads
+from shinzo.utils import setup_logging, get_logger
 
 
 # Configure logging
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "app.main:app",
+        "shinzo.main:app",
         host=settings.host,
         port=settings.port,
         reload=True,

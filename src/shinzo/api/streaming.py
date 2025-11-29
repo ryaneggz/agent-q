@@ -4,10 +4,10 @@ from typing import AsyncGenerator, Optional
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.models import MessageState, SSEEvent
-from app.queue_manager import QueueManager
-from app.config import settings
-from app.utils import get_logger
+from shinzo.models import MessageState, SSEEvent
+from shinzo.queue_manager import QueueManager
+from shinzo.config import settings
+from shinzo.utils import get_logger
 
 
 logger = get_logger(__name__)

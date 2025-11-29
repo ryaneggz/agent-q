@@ -1,4 +1,4 @@
 .PHONY: dev
 
 dev:
-	uv run python -m app.main
+	PYTHONPATH=src uv run python -m shinzo.main

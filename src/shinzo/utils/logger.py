@@ -18,7 +18,7 @@ LOG_FORMAT = (
 def setup_logging():
     """Configure logging for the application using Loguru"""
     # Import here to avoid circular imports
-    from app.config import settings
+    from shinzo.config import settings
 
     # Remove default handler
     logger.remove()

@@ -1,5 +1,5 @@
 import pytest
-from app.models import Priority
+from shinzo.models import Priority
 
 
 @pytest.mark.asyncio

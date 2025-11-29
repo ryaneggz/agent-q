@@ -2,15 +2,15 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.models import (
+from shinzo.models import (
     MessageState,
     MessageStatusResponse,
     ThreadMetadata,
     ThreadMessagesResponse,
     ThreadSummary,
 )
-from app.queue_manager import QueueManager
-from app.utils import get_logger
+from shinzo.queue_manager import QueueManager
+from shinzo.utils import get_logger
 
 
 logger = get_logger(__name__)

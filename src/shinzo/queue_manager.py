@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Dict, Set, List
 
-from app.models import (
+from shinzo.models import (
     QueuedMessage,
     MessageState,
     Priority,
@@ -11,7 +11,7 @@ from app.models import (
     ThreadMetadata,
     ThreadSummary,
 )
-from app.utils import get_logger
+from shinzo.utils import get_logger
 
 
 logger = get_logger(__name__)

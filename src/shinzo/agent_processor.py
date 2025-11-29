@@ -5,11 +5,11 @@ from datetime import datetime
 from langchain.chat_models import init_chat_model
 from langgraph.prebuilt import create_react_agent
 
-from app.models import QueuedMessage, MessageState
-from app.queue_manager import QueueManager
-from app.config import settings
-from app.tools import get_company_info
-from app.utils import get_logger
+from shinzo.models import QueuedMessage, MessageState
+from shinzo.queue_manager import QueueManager
+from shinzo.config import settings
+from shinzo.tools import get_company_info
+from shinzo.utils import get_logger
 
 
 logger = get_logger(__name__)
