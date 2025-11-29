@@ -11,7 +11,7 @@ async def test_thread_created_on_first_message():
     qm = QueueManager()
     thread_id = "thread-123"
 
-    await qm.enqueue("Hello", priority=Priority.NORMAL, thread_id=thread_id)
+    await qm.enqueue("Hello", thread_id=thread_id, priority=Priority.NORMAL)
 
     metadata = await qm.get_thread_metadata(thread_id)
     assert metadata is not None

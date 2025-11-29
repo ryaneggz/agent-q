@@ -1,11 +1,11 @@
 """Custom tools for the LangGraph agent"""
 
-import logging
 from typing import Any, Dict
 import yfinance as yf
 from langchain_core.tools import tool
+from app.utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @tool

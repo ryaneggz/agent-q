@@ -1,7 +1,6 @@
 import asyncio
 from datetime import datetime
 from typing import Optional, Dict, Set, List
-import logging
 
 from app.models import (
     QueuedMessage,
@@ -12,17 +11,18 @@ from app.models import (
     ThreadMetadata,
     ThreadSummary,
 )
+from app.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class QueueManager:
     """Manages the in-memory message queue with priority support"""
 
     def __init__(self):
-        # Priority queue for message processing
-        self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        # Per-thread priority queues for message processing
+        self._thread_queues: Dict[str, asyncio.PriorityQueue] = {}
 
         # Dictionary to store message metadata by ID
         self._messages: Dict[str, QueuedMessage] = {}
@@ -30,8 +30,8 @@ class QueueManager:
         # Lock for thread-safe state transitions
         self._lock = asyncio.Lock()
 
-        # Event to signal when new messages are added
-        self._new_message_event = asyncio.Event()
+        # Per-thread events to signal when new messages are added
+        self._thread_events: Dict[str, asyncio.Event] = {}
 
         # Counter for insertion order (FIFO within same priority)
         self._counter = 0
@@ -39,18 +39,22 @@ class QueueManager:
         # Thread tracking indexes
         self._thread_index: Dict[str, Set[str]] = {}
         self._thread_metadata: Dict[str, ThreadMetadata] = {}
+        
+        # Set of thread IDs that have pending messages
+        self._active_threads: Set[str] = set()
 
     async def enqueue(
         self,
         user_message: str,
+        thread_id: str,
         priority: Priority = Priority.NORMAL,
-        thread_id: Optional[str] = None,
     ) -> QueuedMessage:
         """
         Add a message to the queue
 
         Args:
             user_message: The user's message text
+            thread_id: Thread ID to group related messages (always required)
             priority: Message priority level
 
         Returns:
@@ -68,38 +72,56 @@ class QueueManager:
             # Store message metadata
             self._messages[message.id] = message
 
-            # Track thread association
-            if thread_id:
-                self._track_thread_message(thread_id, message)
+            # Track thread association (including None for backward compatibility)
+            self._track_thread_message(thread_id, message)
 
-            # Add to priority queue
+            # Ensure thread has a queue and event
+            if thread_id not in self._thread_queues:
+                self._thread_queues[thread_id] = asyncio.PriorityQueue()
+                self._thread_events[thread_id] = asyncio.Event()
+
+            # Add to thread-specific priority queue
             # Priority queue uses (priority, counter) tuple for ordering
             # Lower priority number = higher priority
             # Counter ensures FIFO within same priority
             priority_value = PRIORITY_MAP[priority]
-            await self._queue.put((priority_value, self._counter, message.id))
+            await self._thread_queues[thread_id].put((priority_value, self._counter, message.id))
             self._counter += 1
 
+            # Mark thread as active
+            self._active_threads.add(thread_id)
+
+            queue_size = self._thread_queues[thread_id].qsize()
             logger.info(
-                f"Message enqueued: id={message.id}, priority={priority}, "
-                f"queue_size={self._queue.qsize()}"
+                f"Message enqueued: id={message.id}, thread_id={thread_id}, "
+                f"priority={priority}, thread_queue_size={queue_size}"
             )
 
-            # Signal that a new message is available
-            self._new_message_event.set()
+            # Signal that a new message is available for this thread
+            self._thread_events[thread_id].set()
 
             return message
 
-    async def dequeue(self) -> Optional[QueuedMessage]:
+    async def dequeue(self, thread_id: str) -> Optional[QueuedMessage]:
         """
-        Remove and return the next message from the queue
+        Remove and return the next message from a specific thread's queue
+
+        Args:
+            thread_id: The thread ID to dequeue from
 
         Returns:
-            The next QueuedMessage or None if queue is empty
+            The next QueuedMessage or None if thread queue is empty
         """
+        async with self._lock:
+            # Check if thread has a queue
+            if thread_id not in self._thread_queues:
+                return None
+
+            thread_queue = self._thread_queues[thread_id]
+
         try:
             # Get next message (non-blocking)
-            _, _, message_id = await self._queue.get()
+            _, _, message_id = thread_queue.get_nowait()
 
             async with self._lock:
                 message = self._messages.get(message_id)
@@ -112,17 +134,28 @@ class QueueManager:
                         message, MessageState.QUEUED, MessageState.PROCESSING
                     )
 
-                    logger.info(f"Message dequeued: id={message.id}")
+                    # Remove thread from active if queue is now empty
+                    if thread_queue.empty():
+                        self._active_threads.discard(thread_id)
+
+                    logger.info(f"Message dequeued: id={message.id}, thread_id={thread_id}")
                     return message
                 elif message and message.state == MessageState.CANCELLED:
                     # Message was cancelled, skip it
                     logger.info(f"Skipping cancelled message: id={message.id}")
+                    
+                    # Check if queue is now empty
+                    if thread_queue.empty():
+                        self._active_threads.discard(thread_id)
+                    
                     return None
                 else:
                     logger.warning(f"Message not found or invalid state: id={message_id}")
                     return None
 
         except asyncio.QueueEmpty:
+            async with self._lock:
+                self._active_threads.discard(thread_id)
             return None
 
     async def update_state(
@@ -364,14 +397,81 @@ class QueueManager:
                 current_processing=current_processing,
             )
 
-    async def wait_for_messages(self):
-        """Wait until a new message is added to the queue"""
-        await self._new_message_event.wait()
-        self._new_message_event.clear()
+    async def wait_for_messages(self, thread_id: Optional[str] = None):
+        """
+        Wait until a new message is added to a thread's queue
+        
+        Args:
+            thread_id: Optional thread ID to wait for. If None, waits for any thread.
+        """
+        if thread_id:
+            # Wait for specific thread
+            if thread_id not in self._thread_events:
+                async with self._lock:
+                    if thread_id not in self._thread_events:
+                        self._thread_events[thread_id] = asyncio.Event()
+            
+            await self._thread_events[thread_id].wait()
+            self._thread_events[thread_id].clear()
+        else:
+            # Wait for any thread to have messages
+            # Create a task for each thread event
+            async with self._lock:
+                if not self._thread_events:
+                    # No threads yet, wait briefly
+                    await asyncio.sleep(0.1)
+                    return
+                
+                events = list(self._thread_events.values())
+            
+            if events:
+                # Wait for any event to be set
+                done, pending = await asyncio.wait(
+                    [asyncio.create_task(event.wait()) for event in events],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                # Cancel pending tasks
+                for task in pending:
+                    task.cancel()
 
-    def has_messages(self) -> bool:
-        """Check if there are messages in the queue"""
-        return not self._queue.empty()
+    def has_messages(self, thread_id: Optional[str] = None) -> bool:
+        """
+        Check if there are messages in the queue
+        
+        Args:
+            thread_id: Optional thread ID to check. If None, checks all threads.
+            
+        Returns:
+            True if there are messages, False otherwise
+        """
+        if thread_id:
+            # Check specific thread
+            return thread_id in self._thread_queues and not self._thread_queues[thread_id].empty()
+        else:
+            # Check any thread
+            return len(self._active_threads) > 0
+    
+    def get_active_threads(self) -> Set[str]:
+        """
+        Get all thread IDs that have pending messages
+        
+        Returns:
+            Set of thread IDs with pending messages
+        """
+        return self._active_threads.copy()
+    
+    async def get_next_thread_with_messages(self) -> Optional[str]:
+        """
+        Get the next thread ID that has pending messages
+        
+        Returns:
+            Thread ID with pending messages, or None if no threads have messages
+        """
+        async with self._lock:
+            if not self._active_threads:
+                return None
+            # Return any active thread (could be enhanced with priority logic)
+            return next(iter(self._active_threads))
 
     def _track_thread_message(self, thread_id: str, message: QueuedMessage) -> None:
         """Initialize and update thread metadata for a message"""

@@ -1,18 +1,18 @@
 import asyncio
-import logging
 from typing import Optional, AsyncGenerator
 from datetime import datetime
 
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import init_chat_model
 from langgraph.prebuilt import create_react_agent
 
 from app.models import QueuedMessage, MessageState
 from app.queue_manager import QueueManager
 from app.config import settings
 from app.tools import get_company_info
+from app.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AgentProcessor:
@@ -27,9 +27,8 @@ class AgentProcessor:
         """Initialize the LangGraph agent"""
         try:
             # Initialize the LLM
-            llm = ChatOpenAI(
-                model=settings.model_name,
-                api_key=settings.openai_api_key,
+            llm = init_chat_model(
+                model=settings.model,
                 streaming=True,
             )
 
@@ -39,7 +38,7 @@ class AgentProcessor:
                 tools=[get_company_info],
             )
 
-            logger.info(f"Agent initialized with model: {settings.model_name}")
+            logger.info(f"Agent initialized with model: {settings.model}")
 
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")

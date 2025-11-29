@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
@@ -11,9 +10,10 @@ from app.models import (
     ThreadSummary,
 )
 from app.queue_manager import QueueManager
+from app.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter()
 
 # This will be injected by the main app

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 from typing import AsyncGenerator, Optional
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -8,9 +7,10 @@ from fastapi.responses import StreamingResponse
 from app.models import MessageState, SSEEvent
 from app.queue_manager import QueueManager
 from app.config import settings
+from app.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter()
 
 # This will be injected by the main app

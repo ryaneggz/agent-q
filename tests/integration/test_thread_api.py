@@ -62,16 +62,20 @@ async def test_thread_not_found_returns_404(api_client):
 
 @pytest.mark.asyncio
 async def test_backward_compatibility_without_thread(api_client):
+    """Test that backend auto-generates thread_id when not provided"""
     submit_resp = await api_client.post("/messages", json={"message": "Legacy message"})
     assert submit_resp.status_code == 202
     data = submit_resp.json()
-    assert data["thread_id"] is None
+    # Backend should auto-generate thread_id
+    assert data["thread_id"] is not None
+    assert isinstance(data["thread_id"], str)
+    assert len(data["thread_id"]) > 0
 
     status_resp = await api_client.get(f"/messages/{data['message_id']}/status")
     assert status_resp.status_code == 200
     status = status_resp.json()
     assert "thread_id" in status
-    assert status["thread_id"] is None
+    assert status["thread_id"] == data["thread_id"]
 
 
 @pytest.mark.asyncio

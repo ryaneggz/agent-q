@@ -1,4 +1,3 @@
-import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,15 +7,13 @@ from app.queue_manager import QueueManager
 from app.agent_processor import AgentProcessor
 from app.worker import Worker
 from app.api import routes, streaming, threads
+from app.utils import setup_logging, get_logger
 
 
 # Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+setup_logging()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Global instances
 queue_manager: QueueManager = None
